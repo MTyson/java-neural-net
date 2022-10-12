@@ -1,0 +1,120 @@
+package com.infoworld;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Arrays;
+import java.util.Random;
+import java.lang.Math;
+
+import java.util.stream.Collectors;
+
+public class App {
+  public static void main( String[] args ) {
+    App app = new App();
+    app.train();
+  }
+
+  public void train () {
+    Network network = new Network();
+    List<List<Integer>> data = new ArrayList<List<Integer>>();
+    data.add(Arrays.asList(-2, -3));
+    data.add(Arrays.asList(25, 6));
+    data.add(Arrays.asList(17, 4));
+    data.add(Arrays.asList(-15, -6));
+    List<Double> answers = Arrays.asList(1.0,0.0,0.0,1.0);  
+    network.train(data, answers);
+  }
+
+  class Network {
+    double learnRate = .1;
+    int epochs = 20; //1000;
+    Neuron nHidden1 = new Neuron();
+    Neuron nHidden2 = new Neuron();
+    Neuron nOutput = new Neuron();
+    public Double predict(Integer input1, Integer input2){
+      return nOutput.compute(nHidden1.compute(input1, input2), nHidden2.compute(input1, input2));
+    }
+    public void train(List<List<Integer>> data, List<Double> answers){
+      for (int epoch = 0; epoch < epochs; epoch++){
+	System.out.println(": : : : EPOCH: " + epoch);
+        for (int i = 0; i < data.size(); i++){
+          System.out.println("data i: " + i);
+          nHidden1.compute(data.get(i).get(0), data.get(i).get(1));
+	  //if (epoch % 10 == 0) System.out.println("h1: " + nHidden1.getActivatedOutput());
+          nHidden2.compute(data.get(i).get(0), data.get(i).get(1));
+          nOutput.compute(nHidden1.getActivatedOutput(), nHidden2.getActivatedOutput());	
+
+	  double overallLoss = -2 * (answers.get(i) - nOutput.getActivatedOutput()); 
+          //if (epoch % 10 == 0) System.out.println("overallLoss: " + overallLoss);
+ 	  if (epoch % 1 == 0) System.out.println(nHidden1.getWeight1() + " -= " + learnRate + " * " + overallLoss + " * (" + nOutput.getWeight1() + " * " + nOutput.getDerivedOutput() + ") * (" + nHidden1.getInput1() + " * " + nHidden1.getDerivedOutput()+"))");
+	  nHidden1.weight1 -= (learnRate * overallLoss * (nOutput.getWeight1() * nOutput.getDerivedOutput()) * (nHidden1.getInput1() * nHidden1.getDerivedOutput())));
+          //nHidden1.setWeight1(nHidden1.getWeight1() - (learnRate * overallLoss * (nOutput.getWeight1() * nOutput.getDerivedOutput()) * (nHidden1.getInput1() * nHidden1.getDerivedOutput())));
+	  if (epoch % 1 == 0) System.out.println("h1 weight1: " + nHidden1.getWeight1());
+	  nHidden1.setWeight2(nHidden1.getWeight2() - (learnRate * overallLoss * (nOutput.getWeight1() * nOutput.getDerivedOutput()) * (nHidden1.getInput2() * nHidden1.getDerivedOutput())));
+	  nHidden1.setBias(nHidden1.getBias() - (learnRate * overallLoss * (nOutput.getWeight1() * nOutput.getDerivedOutput()) * nHidden1.getDerivedOutput()));
+         
+	  nHidden2.setWeight1(nHidden2.getWeight1() - (learnRate * overallLoss * (nOutput.getWeight2() * nOutput.getDerivedOutput()) * (nHidden2.getInput1() * nHidden2.getDerivedOutput())));
+	  nHidden2.setWeight2(nHidden2.getWeight2() - (learnRate * overallLoss * (nOutput.getWeight2() * nOutput.getDerivedOutput()) * (nHidden2.getInput2() * nHidden2.getDerivedOutput())));
+	  nHidden2.setBias(nHidden2.getBias() - (learnRate * overallLoss * (nOutput.getWeight2() * nOutput.getDerivedOutput()) * nHidden2.getDerivedOutput()));
+
+	  nOutput.setWeight1(nOutput.getWeight1() - (learnRate * overallLoss * (nOutput.getInput1() * nOutput.getDerivedOutput())));
+	  nOutput.setWeight2(nOutput.getWeight2() - (learnRate * overallLoss * (nOutput.getInput2() * nOutput.getDerivedOutput())));
+          nOutput.setBias(nOutput.getBias() - (learnRate * overallLoss * nOutput.getDerivedOutput()));
+	  //if (epoch % 10 == 0) System.out.println("Overall loss: " + overallLoss);
+	  //System.out.println(nOutput.getBias());
+	  //System.out.println(overallLoss);
+	}
+	if (epoch % 100 == 0){
+	  //System.out.println("nOutput.getBias: " + nOutput.getBias());
+  	  List<Double> predictions = data.stream().map( item -> this.predict(item.get(0), item.get(1)) ).collect( Collectors.toList() );
+	  //System.out.println("predictions: " + predictions);
+          Double loss = Util.meanSquareLoss(answers, predictions);
+          System.out.println("--- --- Loss: "+ loss);
+	}
+      }
+    }
+  }
+
+  class Neuron {
+    Random random = new Random();
+    private Double bias = random.nextDouble(); public Double weight1 = random.nextDouble(); private Double weight2 = random.nextDouble();
+    private Double preActivation = null; private Double output = null; private Double input1, input2;
+    public double compute(double input1, double input2){
+      this.input1 = input1;  this.input2 = input2;
+      this.preActivation = (this.weight1 * input1) + (this.weight2 * input2) + this.bias;
+      this.output = Util.sigmoid(this.preActivation);
+//      System.out.println("!!!!! OUTPUT: " + this.output);
+      return this.output;
+    }
+    public Double getInput1() { return this.input1; }
+    public Double getInput2() { return this.input2; }
+    public Double getWeight1() { return this.weight1; }
+    public Double getWeight2() { return this.weight2; }
+    public Double getBias() { return this.bias; }
+    public void setWeight1(Double w){ this.weight1 = w; }
+    public void setWeight2(Double w){ this.weight2 = w; }
+    public void setBias(Double b) { this.bias = b; }
+    public Double getActivatedOutput(){ return this.output; }
+    public Double getPreActivation(){ return this.preActivation; }
+    public Double getDerivedOutput(){ return Util.sigmoidDeriv(this.preActivation); }
+  }
+
+  class Util {
+    public static double sigmoid(double in){
+      return 1 / (1 + Math.exp(-in));
+    }
+    public static double sigmoidDeriv(double in){
+      double sigmoid = Util.sigmoid(in);
+      return sigmoid * (1 - in);
+    }
+    /** Assumes array args are same length */
+    public static Double meanSquareLoss(List<Double> correctAnswers, List<Double> predictedAnswers){
+      double sumSquare = 0;
+      for (int i = 0; i < correctAnswers.size(); i++){
+        double error = correctAnswers.get(i) - predictedAnswers.get(i);
+	sumSquare += (error * error);
+      }
+      return sumSquare / (correctAnswers.size());
+    }
+  }
+}
